@@ -175,7 +175,7 @@ public class SpeechRecoActivity extends AppCompatActivity {
         switch (view.getId()) {
             case R.id.btnSpeech:
 
-//                mTvShow.setText("正在识别中~");
+//                mTvShow.setText(null);
                 initParameter();
 
                 mIatDialog.show();
