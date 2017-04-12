@@ -1,0 +1,42 @@
+package com.gqq.speechdemo;
+
+import android.content.Intent;
+import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
+import android.view.View;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import com.iflytek.cloud.RecognizerListener;
+import com.iflytek.cloud.RecognizerResult;
+import com.iflytek.cloud.SpeechConstant;
+import com.iflytek.cloud.SpeechError;
+import com.iflytek.cloud.SpeechRecognizer;
+
+import butterknife.BindView;
+import butterknife.ButterKnife;
+import butterknife.OnClick;
+
+public class MainActivity extends AppCompatActivity {
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        ButterKnife.bind(this);
+    }
+
+    @OnClick({R.id.btnReco, R.id.btnTran})
+    public void onClick(View view) {
+        switch (view.getId()) {
+            case R.id.btnReco:
+                startActivity(new Intent(this, SpeechRecoActivity.class));
+                break;
+            case R.id.btnTran:
+                startActivity(new Intent(this, SpeechTranActivity.class));
+                break;
+        }
+    }
+}
