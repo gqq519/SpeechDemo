@@ -69,3 +69,14 @@
     }
   ]
 }
+
+/**
+         * sn  number :第几句
+         * ls   boolean: 是否最后一句
+         * bg  number :开始
+         * ed  number :结束
+         * ws  array :词
+         * cw   array :中文分词
+         * w  string :单字
+         * sc  number :分数
+         */

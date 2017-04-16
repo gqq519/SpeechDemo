@@ -3,6 +3,7 @@ package com.gqq.speechdemo;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -46,6 +47,8 @@ public class SpeechRecoActivity extends AppCompatActivity {
     private RecognizerDialog mIatDialog;
 
     private HashMap<String, String> mIatResults = new LinkedHashMap<String, String>();
+    private int mRet;
+    private String mGrammarID;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,11 +56,13 @@ public class SpeechRecoActivity extends AppCompatActivity {
         setContentView(R.layout.activity_speech_reco);
         ButterKnife.bind(this);
 
+        Log.i("TAG","on");
+
         //1.创建SpeechRecognizer对象，第二个参数：本地听写时传InitListener
-        mSpeechRecognizer = SpeechRecognizer.createRecognizer(SpeechRecoActivity.this,initListener);
+        mSpeechRecognizer = SpeechRecognizer.createRecognizer(SpeechRecoActivity.this, initListener);
 
         // 语音听写对象
-        mIatDialog = new RecognizerDialog(this,initListener);
+        mIatDialog = new RecognizerDialog(this, initListener);
 
         //2.设置听写参数，详见《科大讯飞MSC API手册(Android)》SpeechConstant类
         initParameter();
@@ -78,8 +83,19 @@ public class SpeechRecoActivity extends AppCompatActivity {
 //一般情况下会通过onResults接口多次返回结果，完整的识别内容是多次结果的累加；
 //关于解析Json的代码可参见MscDemo中JsonParser类；
 //isLast等于true时会话结束。
+
+        /**
+         * sn  number :第几句
+         * ls   boolean: 是否最后一句
+         * bg  number :开始
+         * ed  number :结束
+         * ws  array :词
+         * cw   array :中文分词
+         * w  string :单字
+         * sc  number :分数
+         */
         public void onResult(RecognizerResult results, boolean isLast) {
-            Log.d("Result:", results.getResultString());
+            Log.d("TAG:", results.getResultString());
             printResult(results);
 //           if (isLast){
 //               String resultString = results.getResultString();
@@ -170,30 +186,146 @@ public class SpeechRecoActivity extends AppCompatActivity {
     }
 
 
-    @OnClick({R.id.btnSpeech, R.id.btnOver})
+    @OnClick({R.id.btnSpeech, R.id.btnOver,R.id.btnUp,R.id.btnReco})
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.btnSpeech:
 
 //                mTvShow.setText(null);
+                mIatResults.clear();
                 initParameter();
 
                 mIatDialog.show();
 
                 // 开始听写：
                 int ret = mSpeechRecognizer.startListening(mRecoListener);
-                if (ret!=ErrorCode.SUCCESS){
-                    Toast.makeText(this, "语音识别失败："+ret, Toast.LENGTH_SHORT).show();
-            }
+                if (ret != ErrorCode.SUCCESS) {
+                    Toast.makeText(this, "语音识别失败：" + ret, Toast.LENGTH_SHORT).show();
+                }
 
                 break;
             case R.id.btnOver:
 
+
                 mSpeechRecognizer.stopListening();
 
                 break;
+
+            case R.id.btnUp:
+
+                upContacts();
+
+                break;
+
+            case R.id.btnReco:
+
+                recoSpeech();
+                break;
         }
     }
+
+    // 语音识别
+    private void recoSpeech() {
+
+        //云端语法识别：如需本地识别请参照本地识别
+        //1.创建SpeechRecognizer对象
+
+        // ABNF语法示例，可以说”北京到上海”
+        String mCloudGrammar = "#ABNF 1.0 UTF-8;" +
+                "languagezh-CN; " +
+                "mode voice; " +
+                "root $main; " +
+                "$main = $place1 到$place2 ; " +
+                "$place1 = 北京 | 武汉 | 南京 | 天津 | 天京 | 东京; " +
+                "$place2 = 上海 | 合肥; ";
+        //2.构建语法文件
+        mSpeechRecognizer.setParameter(SpeechConstant.TEXT_ENCODING, "utf-8");
+        int ret = mSpeechRecognizer.buildGrammar("abnf", mCloudGrammar , grammarListener);
+        if (ret != ErrorCode.SUCCESS){
+            Log.d("TAG","语法构建失败,错误码：" + ret);
+        }else{
+            Log.d("TAG","语法构建成功");
+        }
+        //3.开始识别,设置引擎类型为云端
+        mSpeechRecognizer.setParameter(SpeechConstant.ENGINE_TYPE, "cloud");
+        //设置grammarId
+        mSpeechRecognizer.setParameter(SpeechConstant.CLOUD_GRAMMAR, mGrammarID);
+        ret = mSpeechRecognizer.startListening(mRecoListener);
+        if (ret != ErrorCode.SUCCESS) {
+            Log.d("TAG","识别失败,错误码: " + ret);
+        }
+
+        }
+
+    //构建语法监听器
+    private com.iflytek.cloud.GrammarListener grammarListener = new com.iflytek.cloud.GrammarListener() {
+        @Override
+        public void onBuildFinish(String grammarId, SpeechError error) {
+
+            mGrammarID = new String(grammarId);
+
+            if(error == null){
+                if(!TextUtils.isEmpty(grammarId)){
+                    //构建语法成功，请保存grammarId用于识别
+                }else{
+                    Log.d("TAG","语法构建失败,错误码：" + error.getErrorCode());
+                }
+            }}
+        };
+
+
+
+    // 上传联系人
+    private void upContacts() {
+
+        Log.i("TAG","方法开始");
+
+
+        //获取ContactManager实例化对象
+        com.iflytek.cloud.util.ContactManager mgr = com.iflytek.cloud.util.ContactManager.createManager(this, mContactListener);
+
+        Log.i("TAG","1");
+
+
+        //异步查询联系人接口，通过onContactQueryFinish接口回调
+        mgr.asyncQueryAllContactsName();
+
+        Log.i("TAG","2");
+
+    }
+
+    //获取联系人监听器。
+    private com.iflytek.cloud.util.ContactManager.ContactListener mContactListener = new com.iflytek.cloud.util.ContactManager.ContactListener() {
+        @Override
+        public void onContactQueryFinish(String contactInfos, boolean changeFlag) {
+            //指定引擎类型
+
+            Log.i("TAG","3");
+
+
+            mSpeechRecognizer.setParameter(SpeechConstant.ENGINE_TYPE, SpeechConstant.TYPE_CLOUD);
+            mSpeechRecognizer.setParameter(SpeechConstant.TEXT_ENCODING, "utf-8");
+            mRet = mSpeechRecognizer.updateLexicon("contact", contactInfos, lexiconListener);
+
+            if (mRet != ErrorCode.SUCCESS) {
+                Log.d("TAG", "上传联系人失败：" + mRet);
+            }
+        }
+    };
+    //上传联系人监听器。
+    private com.iflytek.cloud.LexiconListener lexiconListener = new com.iflytek.cloud.LexiconListener() {
+        @Override
+        public void onLexiconUpdated(String lexiconId, SpeechError error) {
+
+            Log.i("TAG","4");
+
+            if (error != null) {
+                Log.d("TAG", error.toString());
+            } else {
+                Log.d("TAG", "上传成功！");
+            }
+        }
+    };
 
     // 设置听写参数
     private void initParameter() {
@@ -205,8 +337,8 @@ public class SpeechRecoActivity extends AppCompatActivity {
         // 设置返回结果格式
         mSpeechRecognizer.setParameter(SpeechConstant.RESULT_TYPE, "json");
 
-            // 设置语言
-            mSpeechRecognizer.setParameter(SpeechConstant.LANGUAGE, "zh_cn");
+        // 设置语言
+        mSpeechRecognizer.setParameter(SpeechConstant.LANGUAGE, "zh_cn");
 
         // 设置语音前端点:静音超时时间，即用户多长时间不说话则当做超时处理
         mSpeechRecognizer.setParameter(SpeechConstant.VAD_BOS, "4000");
